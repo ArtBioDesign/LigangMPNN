@@ -1,0 +1,64 @@
+ARG CUDA=12.2.0
+FROM nvidia/cuda:${CUDA}-devel-ubuntu20.04
+
+#FROM localhost/nvidia/cuda:12.2.2-base-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /workspace/pmpnn
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    bzip2 \
+    ca-certificates \
+    curl \
+    git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Miniconda
+ENV MINICONDA_VERSION=py38_4.10.3
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-$MINICONDA_VERSION-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p /opt/conda && \
+    rm /tmp/miniconda.sh
+
+ENV PATH=/opt/conda/bin:$PATH
+
+
+# Update conda
+RUN conda update -n base -c defaults conda
+
+# Set up Conda channels using Tsinghua and USTC mirrors
+RUN conda config --add channels 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/' && \
+    conda config --add channels 'https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/' && \
+    conda config --add channels 'https://mirrors.ustc.edu.cn/anaconda/cloud/bioconda/' && \
+    conda config --add channels 'https://mirrors.ustc.edu.cn/anaconda/cloud/msys2/' && \
+    conda config --set show_channel_urls yes
+
+# Copy the project files into the container
+COPY ./ProteinMPNN/ /workspace/pmpnn/
+
+
+
+
+
+
+# Create and activate conda environment
+RUN conda init bash && \
+    conda env create -f /workspace/pmpnn/environment.yml && \
+    echo "conda activate ligandmpnn_env" >> ~/.bashrc
+
+# Set up environment variable
+# ENV PU_ENV=/opt/conda/envs/PUEPP
+
+# Add PU_ENV environment to PATH
+ENV PATH=$PU_ENV/bin:$PATH
+
+
+#set the entry point
+ENTRYPOINT ["/bin/bash", "-c", "source activate ligandmpnn_env"]
+
+# Set the default command to run the script with arguments
+#CMD ["/workspace/DHR/input/input_test.fasta", "/workspace/DHR/input/db_index", "/workspace/DHR/input/fastmsa-cpu.ckpt", "/tmp/temp_out"]
+CMD ["/workspace/pmpnn/run.sh"]
